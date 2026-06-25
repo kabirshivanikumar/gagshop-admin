@@ -9,7 +9,7 @@ const TABS = [
   { key: 'appearance', label: 'Appearance', icon: <Palette size={14} /> },
   { key: 'banner', label: 'Banner & Ticker', icon: <Megaphone size={14} /> },
   { key: 'payments', label: 'Payments', icon: <CreditCard size={14} /> },
-  { key: 'email', label: 'Email', icon: <Mail size={14} /> },
+  { key: 'email', label: 'Email & Flow', icon: <Mail size={14} /> },
   { key: 'social', label: 'Social', icon: <Globe size={14} /> },
 ]
 
@@ -25,7 +25,7 @@ const PRESETS = [
 const BUILTIN_PAYMENTS = [
   { key: 'paypal', label: 'PayPal', icon: '💰', desc: 'Accept PayPal payments' },
   { key: 'stripe', label: 'Stripe', icon: '💳', desc: 'Credit & debit cards' },
-  { key: 'crypto', label: 'Crypto', icon: '₿', desc: 'BTC, ETH, USDT, etc.' },
+  { key: 'crypto', label: 'Crypto (NOWPayments)', icon: '₿', desc: 'Automated BTC, ETH, LTC on-chain gateway' },
   { key: 'bank', label: 'Bank Transfer', icon: '🏦', desc: 'Manual bank transfer' },
   { key: 'cashapp', label: 'CashApp', icon: '💚', desc: 'CashApp payments' },
   { key: 'venmo', label: 'Venmo', icon: '🔵', desc: 'Venmo payments' },
@@ -40,7 +40,7 @@ export default function SettingsPage() {
   const [local, setLocal] = useState({})
   const [saving, setSaving] = useState(false)
 
-  // Custom payments state
+  // Custom payments state managers
   const [customPayments, setCustomPayments] = useState([])
   const [loadingPayments, setLoadingPayments] = useState(false)
   const [payModal, setPayModal] = useState(null) // null | 'add' | 'edit'
@@ -133,7 +133,7 @@ export default function SettingsPage() {
             <FG l="Site Name"><input value={v('site_name')} onChange={e => s('site_name', e.target.value)} placeholder="VoidEnterprises" /></FG>
             <FG l="Tagline"><input value={v('site_tagline')} onChange={e => s('site_tagline', e.target.value)} placeholder="Premium Roblox Items" /></FG>
             <FG l="Logo URL" h="Leave blank for text logo"><input value={v('logo_url')} onChange={e => s('logo_url', e.target.value)} placeholder="https://..." /></FG>
-            <FG l="Footer Text"><input value={v('footer_text')} onChange={e => s('footer_text', e.target.value)} placeholder="© 2025 VoidEnterprises" /></FG>
+            <FG l="Footer Text"><input value={v('footer_text')} onChange={e => s('footer_text', e.target.value)} placeholder="© 2026 VoidEnterprises" /></FG>
             <div className="divider" />
             <ST>Currency & Tax</ST>
             <div className="grid-2">
@@ -210,11 +210,11 @@ export default function SettingsPage() {
 
             <div className="divider" />
 
-            {/* Custom payment methods */}
+            {/* Custom Payment Methods Sub-Section Manager UI */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <div>
                 <ST>Custom Payment Methods</ST>
-                <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: -10 }}>Add PayLah, GCash, bank QR codes, etc.</p>
+                <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: -10 }}>Add NexaPay, PayLah, GCash, bank QR codes, etc.</p>
               </div>
               <button className="btn btn-primary btn-sm" onClick={() => { setPayForm(CUSTOM_EMPTY); setPayModal('add') }}>
                 <Plus size={13} /> Add Method
@@ -227,7 +227,7 @@ export default function SettingsPage() {
               <div style={{ textAlign: 'center', padding: '28px 20px', background: 'rgba(255,255,255,0.02)', borderRadius: 12, border: '1px dashed var(--border)' }}>
                 <div style={{ fontSize: 32, marginBottom: 8 }}>💳</div>
                 <p style={{ fontSize: 13, color: 'var(--muted)' }}>No custom methods yet</p>
-                <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>Add PayLah, GCash, bank QR codes and more</p>
+                <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>Add manual options (e.g. NexaPay) to prompt user proof uploads</p>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -265,8 +265,15 @@ export default function SettingsPage() {
             <FG l="Stripe Public Key"><input value={v('stripe_public_key')} onChange={e => s('stripe_public_key', e.target.value)} placeholder="pk_live_..." /></FG>
           </>}
 
-          {/* EMAIL */}
+          {/* EMAIL & OPERATIONAL FULFILLMENT WORKFLOW INFO */}
           {tab === 'email' && <>
+            <ST>Fulfillment & Status Operations</ST>
+            <div style={{ padding: 14, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.18)', borderRadius: 10, marginBottom: 18, fontSize: 12, lineHeight: 1.7 }}>
+              <strong>📌 Automated Status Routing Operations Logic:</strong><br />
+              • <strong>Custom Payment Methods (e.g. NexaPay):</strong> Orders land instantly as <code style={{ background: 'rgba(0,0,0,0.2)', padding: '1px 5px', borderRadius: 4 }}>on-hold</code>. Staff must click into the order records details list inside the master Admin Orders Dashboard panel to check user uploaded screenshots prior to fullfillment approval clicks.<br />
+              • <strong>NOWPayments Automation Gateway:</strong> Stays isolated as <code style={{ background: 'rgba(0,0,0,0.2)', padding: '1px 5px', borderRadius: 4 }}>pending</code> until their API webhook verifies the blockchain ledger confirmations, matching tracking hashes, and marks records directly to <code style={{ background: 'rgba(0,0,0,0.2)', padding: '1px 5px', borderRadius: 4 }}>paid</code>.
+            </div>
+
             <ST>EmailJS Setup</ST>
             <div style={{ padding: 14, background: 'rgba(6,182,212,0.07)', border: '1px solid rgba(6,182,212,0.18)', borderRadius: 10, marginBottom: 18, fontSize: 12, lineHeight: 1.7 }}>
               <strong>How to configure order confirmation emails:</strong><br />
@@ -297,7 +304,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Custom Payment Modal */}
+      {/* Custom Payment Modal Portal Module */}
       {payModal && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setPayModal(null)}>
           <div className="modal modal-lg">
@@ -309,7 +316,7 @@ export default function SettingsPage() {
             <div className="grid-2">
               <div className="form-group">
                 <label className="form-label">Method Name *</label>
-                <input value={payForm.name} onChange={e => setPayForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. PayLah, GCash, Paynow" autoFocus />
+                <input value={payForm.name} onChange={e => setPayForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. NexaPay, PayLah, GCash" autoFocus />
               </div>
               <div className="form-group">
                 <label className="form-label">Icon / Emoji</label>
@@ -318,33 +325,32 @@ export default function SettingsPage() {
               </div>
               <div className="form-group">
                 <label className="form-label">Short Description</label>
-                <input value={payForm.description} onChange={e => setPayForm(f => ({ ...f, description: e.target.value }))} placeholder="e.g. Pay via PayLah wallet" />
+                <input value={payForm.description} onChange={e => setPayForm(f => ({ ...f, description: e.target.value }))} placeholder="e.g. Pay via NexaPay portal link" />
               </div>
               <div className="form-group">
                 <label className="form-label">Account / Phone / ID</label>
-                <input value={payForm.account_info} onChange={e => setPayForm(f => ({ ...f, account_info: e.target.value }))} placeholder="e.g. +65 9123 4567 or @handle" />
+                <input value={payForm.account_info} onChange={e => setPayForm(f => ({ ...f, account_info: e.target.value }))} placeholder="e.g. @handle or account ID" />
                 <div className="form-hint">Shown to customer after placing order</div>
               </div>
             </div>
 
             <div className="form-group">
               <label className="form-label">Payment Instructions</label>
-              <textarea rows={3} value={payForm.instructions} onChange={e => setPayForm(f => ({ ...f, instructions: e.target.value }))} placeholder="e.g. Open PayLah app → scan QR or send to +65 9123 4567 → include your order number as reference." />
+              <textarea rows={3} value={payForm.instructions} onChange={e => setPayForm(f => ({ ...f, instructions: e.target.value }))} placeholder="Instructions template supporting dynamic elements like {total} and {order} text codes..." />
               <div className="form-hint">Shown to customer on the order confirmation page</div>
             </div>
 
             <div className="form-group">
               <label className="form-label">QR Code Image URL</label>
-              <input value={payForm.qr_code_url} onChange={e => setPayForm(f => ({ ...f, qr_code_url: e.target.value }))} placeholder="https://yourcdn.com/paylah-qr.png" />
+              <input value={payForm.qr_code_url} onChange={e => setPayForm(f => ({ ...f, qr_code_url: e.target.value }))} placeholder="https://yourcdn.com/payment-qr.png" />
               <div className="form-hint">
-                Upload your QR code image to <a href="https://imgbb.com" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>imgbb.com</a> or <a href="https://imgur.com" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>imgur.com</a> (free) and paste the direct link here
+                Upload your QR code image to <a href="https://imgbb.com" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>imgbb.com</a> and paste direct link here
               </div>
               {payForm.qr_code_url && (
                 <div style={{ marginTop: 12, display: 'flex', alignItems: 'flex-start', gap: 14 }}>
                   <img src={payForm.qr_code_url} alt="QR Preview" style={{ width: 120, height: 120, objectFit: 'contain', borderRadius: 10, background: '#fff', padding: 8, border: '1px solid var(--border)' }} onError={e => { e.target.style.display='none' }} />
                   <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4, lineHeight: 1.6 }}>
-                    ✅ QR code preview<br />
-                    Customers will see this on the checkout confirmation page to scan and pay.
+                    ✅ QR code active preview
                   </div>
                 </div>
               )}
