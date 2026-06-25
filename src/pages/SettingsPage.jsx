@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Save, Palette, Globe, CreditCard, Mail, Store, Megaphone, Plus, Trash2, X, Pencil, Upload } from 'lucide-react'
-import { useSettings } from '../context/SettingsContext'
-import { useToast } from '../components/ui/Toast'
+import { Save, Palette, Globe, CreditCard, Mail, Store, Megaphone, Plus, Trash2, X, Pencil } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/ui/Toast'
 
 const TABS = [
   { key: 'general', label: 'General', icon: <Store size={14} /> },
@@ -34,29 +33,42 @@ const BUILTIN_PAYMENTS = [
 const CUSTOM_EMPTY = { name: '', icon: '💳', description: '', instructions: '', qr_code_url: '', account_info: '', is_active: true, display_order: 0 }
 
 export default function SettingsPage() {
-  const { settings, updateSettings, refreshSettings } = useSettings()
   const toast = useToast()
   const [tab, setTab] = useState('general')
-  const [local, setLocal] = useState({})
+  const [dbSettings, setDbSettings] = useState({}) // Stores clean DB state
+  const [local, setLocal] = useState({})          // Stores staging input state
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  // Custom payments state managers
+  // Custom payments states
   const [customPayments, setCustomPayments] = useState([])
   const [loadingPayments, setLoadingPayments] = useState(false)
   const [payModal, setPayModal] = useState(null)
   const [payForm, setPayForm] = useState(CUSTOM_EMPTY)
   const [savingPay, setSavingPay] = useState(false)
 
-  // Sync state cleanly whenever base context loads or changes
-  useEffect(() => {
-    if (settings) {
-      setLocal(prev => ({ ...settings, ...prev }))
-    }
-  }, [settings])
+  // Fetch clean production parameters directly from Supabase
+  async function loadAllSettings() {
+    try {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('site_settings')
+        .select('*')
+        .eq('key', 'void_config')
+        .single()
 
-  useEffect(() => {
-    if (tab === 'payments') fetchCustomPayments()
-  }, [tab])
+      if (error && error.code !== 'PGRST116') throw error
+
+      if (data) {
+        setDbSettings(data)
+        setLocal(data)
+      }
+    } catch (e) {
+      toast.error('Failed to load settings: ' + e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   async function fetchCustomPayments() {
     setLoadingPayments(true)
@@ -65,44 +77,20 @@ export default function SettingsPage() {
     setLoadingPayments(false)
   }
 
-  async function saveCustomPayment() {
-    if (!payForm.name.trim()) { toast.error('Payment method name required'); return }
-    setSavingPay(true)
-    try {
-      const payload = { ...payForm, display_order: parseInt(payForm.display_order) || 0 }
-      if (payModal === 'add') {
-        delete payload.id
-        const { error } = await supabase.from('custom_payment_methods').insert(payload)
-        if (error) throw error
-        toast.success('Payment method added!')
-      } else {
-        const { error } = await supabase.from('custom_payment_methods').update(payload).eq('id', payForm.id)
-        if (error) throw error
-        toast.success('Payment method updated!')
-      }
-      setPayModal(null)
-      fetchCustomPayments()
-    } catch (e) { toast.error(e.message) }
-    finally { setSavingPay(false) }
-  }
+  useEffect(() => {
+    loadAllSettings()
+  }, [])
 
-  async function deleteCustomPayment(id, name) {
-    if (!confirm(`Delete "${name}"?`)) return
-    await supabase.from('custom_payment_methods').delete().eq('id', id)
-    toast.success('Deleted')
-    fetchCustomPayments()
-  }
+  useEffect(() => {
+    if (tab === 'payments') fetchCustomPayments()
+  }, [tab])
 
-  async function toggleCustomPayment(id, val) {
-    await supabase.from('custom_payment_methods').update({ is_active: val }).eq('id', id)
-    setCustomPayments(cs => cs.map(c => c.id === id ? { ...c, is_active: val } : c))
-  }
-
-  const v = (key) => local[key] !== undefined ? local[key] : (settings?.[key] ?? '')
+  // Clean value reader helper
+  const v = (key) => local[key] !== undefined ? local[key] : ''
   const s = (key, value) => setLocal(prev => ({ ...prev, [key]: value }))
-  
-  // Strict change tracking comparison
-  const hasChanges = Object.keys(local).some(key => local[key] !== settings?.[key])
+
+  // Evaluate structural differences between state forms
+  const hasChanges = Object.keys(local).some(key => local[key] !== dbSettings[key])
 
   const payMethods = (() => { try { return JSON.parse(v('payment_methods') || '[]') } catch { return [] } })()
   const togglePay = (method) => {
@@ -110,34 +98,103 @@ export default function SettingsPage() {
     s('payment_methods', JSON.stringify(next))
   }
 
+  // FORCE PRODUCTION OVERRIDE METHOD
   async function saveSettings() {
     setSaving(true)
     try {
-      // 1. Force hard direct save to Supabase via the update function
-      await updateSettings(local)
-      
-      // 2. Clear out any hanging context configurations
-      if (refreshSettings) {
-        await refreshSettings()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Session invalid. Please log back in.')
+
+      // Clean payload structure containing precise DB schema columns
+      const cleanPayload = {
+        key: 'void_config',
+        site_name: local.site_name || '',
+        site_tagline: local.site_tagline || '',
+        logo_url: local.logo_url || '',
+        footer_text: local.footer_text || '',
+        currency_symbol: local.currency_symbol || '$',
+        currency_code: local.currency_code || 'USD',
+        tax_rate: parseFloat(local.tax_rate) || 0,
+        maintenance_mode: String(local.maintenance_mode || 'false'),
+        payment_methods: local.payment_methods || '[]',
+        primary_color: local.primary_color || '#6366f1',
+        secondary_color: local.secondary_color || '#8b5cf6',
+        accent_color: local.accent_color || '#06b6d4',
+        background_dark: local.background_dark || '#0f0f1a',
+        background_card: local.background_card || '#1a1a2e',
+        text_primary: local.text_primary || '#ffffff',
+        ticker_enabled: String(local.ticker_enabled || 'false'),
+        ticker_text: local.ticker_text || '',
+        banner_url: local.banner_url || '',
+        banner_headline: local.banner_headline || '',
+        banner_subtext: local.banner_subtext || '',
+        hero_cta_text: local.hero_cta_text || '',
+        emailjs_service_id: local.emailjs_service_id || '',
+        emailjs_template_id: local.emailjs_template_id || '',
+        emailjs_public_key: local.emailjs_public_key || '',
+        admin_email: local.admin_email || '',
+        social_discord: local.social_discord || '',
+        social_twitter: local.social_twitter || '',
+        social_youtube: local.social_youtube || '',
+        updated_at: new Date().toISOString()
       }
-      
-      toast.success('Settings synchronized successfully!')
-    } catch (e) { 
-      console.error("Critical Save Error: ", e)
-      toast.error('Sync failed: ' + e.message) 
-    } finally { 
-      setSaving(false) 
+
+      const { data, error } = await supabase
+        .from('site_settings')
+        .upsert(cleanPayload, { onConflict: 'key' })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      setDbSettings(data)
+      setLocal(data)
+      toast.success('Database override executed successfully!')
+    } catch (e) {
+      console.error('[Database Overwrite Error]:', e)
+      toast.error('Sync failed: ' + e.message)
+    } finally {
+      setSaving(false)
     }
   }
+
+  // Custom Payments operations
+  async function saveCustomPayment() {
+    if (!payForm.name.trim()) { toast.error('Payment name required'); return }
+    setSavingPay(true)
+    try {
+      const payload = { ...payForm, display_order: parseInt(payForm.display_order) || 0 }
+      if (payModal === 'add') {
+        delete payload.id
+        const { error } = await supabase.from('custom_payment_methods').insert(payload)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('custom_payment_methods').update(payload).eq('id', payForm.id)
+        if (error) throw error
+      }
+      setPayModal(null)
+      fetchCustomPayments()
+      toast.success('Payment method updated!')
+    } catch (e) { toast.error(e.message) }
+    finally { setSavingPay(false) }
+  }
+
+  async function deleteCustomPayment(id, name) {
+    if (!confirm(`Delete "${name}"?`)) return
+    await supabase.from('custom_payment_methods').delete().eq('id', id)
+    fetchCustomPayments()
+  }
+
+  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><div className="spinner spinner-md" /></div>
 
   return (
     <div>
       {hasChanges && (
         <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.4)', borderRadius: 10, padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, backdropFilter: 'blur(8px)' }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>⚠️ You have unsaved configuration updates</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>⚠️ Unsaved settings changes detected</span>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-secondary btn-sm" onClick={() => setLocal({ ...settings })}>Discard</button>
-            <button className="btn btn-primary btn-sm" onClick={saveSettings} disabled={saving}>{saving ? <div className="spinner spinner-sm" /> : <><Save size={13} /> Synchronize Table</>}</button>
+            <button className="btn btn-secondary btn-sm" onClick={() => setLocal({ ...dbSettings })}>Discard</button>
+            <button className="btn btn-primary btn-sm" onClick={saveSettings} disabled={saving}>{saving ? <div className="spinner spinner-sm" /> : <><Save size={13} /> Overwrite Table</>}</button>
           </div>
         </div>
       )}
@@ -152,29 +209,28 @@ export default function SettingsPage() {
           {/* GENERAL */}
           {tab === 'general' && <>
             <ST>Site Identity</ST>
-            <FG l="Site Name"><input value={v('site_name')} onChange={e => s('site_name', e.target.value)} placeholder="VoidEnterprises" /></FG>
+            <FG l="Site Name"><input value={v('site_name')} onChange={e => s('site_name', e.target.value)} placeholder="Void Enterprises" /></FG>
             <FG l="Tagline"><input value={v('site_tagline')} onChange={e => s('site_tagline', e.target.value)} placeholder="Premium Roblox Items" /></FG>
-            <FG l="Logo URL" h="Provide your direct Supabase Public-Storage path link"><input value={v('logo_url')} onChange={e => s('logo_url', e.target.value)} placeholder="https://..." /></FG>
+            <FG l="Logo URL" h="Provide your direct Supabase Public-Storage transparent path link"><input value={v('logo_url')} onChange={e => s('logo_url', e.target.value)} placeholder="https://..." /></FG>
             
-            {/* Live logo preview diagnostic box */}
             {v('logo_url') && (
               <div style={{ padding: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 6 }}>Live Core Asset Verification Preview:</div>
-                <img src={v('logo_url')} alt="Preview" style={{ maxHeight: 50, objectFit: 'contain' }} onError={(e) => { e.target.style.border = "1px dashed #ef4444"; }} />
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 6 }}>Live Logo Verification:</div>
+                <img src={v('logo_url')} alt="Preview" style={{ maxHeight: 42, objectFit: 'contain' }} onError={(e) => { e.target.style.border = "1px dashed #ef4444"; }} />
               </div>
             )}
 
-            <FG l="Footer Text"><input value={v('footer_text')} onChange={e => s('footer_text', e.target.value)} placeholder="© 2026 VoidEnterprises" /></FG>
+            <FG l="Footer Text"><input value={v('footer_text')} onChange={e => s('footer_text', e.target.value)} placeholder="© 2026 Void Enterprises" /></FG>
             <div className="divider" />
             <ST>Currency & Tax</ST>
             <div className="grid-2">
               <FG l="Symbol"><input value={v('currency_symbol')} onChange={e => s('currency_symbol', e.target.value)} placeholder="$" /></FG>
               <FG l="Code"><input value={v('currency_code')} onChange={e => s('currency_code', e.target.value)} placeholder="USD" /></FG>
-              <FG l="Tax Rate (%)"><input type="number" min="0" max="100" step="0.1" value={v('tax_rate')} onChange={e => s('tax_rate', e.target.value)} placeholder="0" /></FG>
+              <FG l="Tax Rate (%)"><input type="number" min="0" max="100" step="0.1" value={v('tax_rate')} onChange={e => s('tax_rate', e.target.value)} /></FG>
             </div>
             <div className="divider" />
             <ST>Maintenance</ST>
-            <Tog l="Enable Maintenance Mode" h="Hides the shop from customers" val={v('maintenance_mode') === 'true'} onChange={x => s('maintenance_mode', String(x))} />
+            <Tog l="Enable Maintenance Mode" val={v('maintenance_mode') === 'true'} onChange={x => s('maintenance_mode', String(x))} />
           </>}
 
           {/* APPEARANCE */}
@@ -235,81 +291,32 @@ export default function SettingsPage() {
                 </label>
               ))}
             </div>
-
-            <div className="divider" />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <div>
-                <ST>Custom Payment Methods</ST>
-              </div>
-              <button className="btn btn-primary btn-sm" onClick={() => { setPayForm(CUSTOM_EMPTY); setPayModal('add') }}><Plus size={13} /> Add Method</button>
-            </div>
-
-            {loadingPayments ? <div style={{ textAlign: 'center', padding: 24 }}><div className="spinner spinner-md" style={{ margin: '0 auto' }} /></div> : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {customPayments.map(m => (
-                  <div key={m.id} style={{ padding: '14px 16px', borderRadius: 12, border: '1px solid var(--border)', background: 'rgba(255,255,255,0.01)', display: 'flex', alignItems: 'center', gap: 14 }}>
-                    <span style={{ fontSize: 28 }}>{m.icon}</span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>{m.name} {!m.is_active && '(Inactive)'}</div>
-                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>{m.account_info}</div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button className="btn btn-secondary btn-sm" onClick={() => { setPayForm(m); setPayModal('edit') }}><Pencil size={12} /></button>
-                      <button className="btn btn-danger btn-sm" onClick={() => deleteCustomPayment(m.id, m.name)}><Trash2 size={12} /></button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </>}
 
           {/* EMAIL */}
           {tab === 'email' && <>
-            <ST>Fulfillment Workflow Routing</ST>
+            <ST>Workflow Emails (EmailJS)</ST>
             <FG l="Service ID"><input value={v('emailjs_service_id')} onChange={e => s('emailjs_service_id', e.target.value)} /></FG>
             <FG l="Template ID"><input value={v('emailjs_template_id')} onChange={e => s('emailjs_template_id', e.target.value)} /></FG>
             <FG l="Public Key"><input value={v('emailjs_public_key')} onChange={e => s('emailjs_public_key', e.target.value)} /></FG>
-            <FG l="Admin Notification Email"><input type="email" value={v('admin_email')} onChange={e => s('admin_email', e.target.value)} /></FG>
+            <FG l="Admin Alert Target"><input type="email" value={v('admin_email')} onChange={e => s('admin_email', e.target.value)} /></FG>
           </>}
 
           {/* SOCIAL */}
           {tab === 'social' && <>
-            <ST>Social Links</ST>
-            <FG l="Discord Server URL"><input value={v('social_discord')} onChange={e => s('social_discord', e.target.value)} /></FG>
-            <FG l="Twitter / X URL"><input value={v('social_twitter')} onChange={e => s('social_twitter', e.target.value)} /></FG>
-            <FG l="YouTube Channel URL"><input value={v('social_youtube')} onChange={e => s('social_youtube', e.target.value)} /></FG>
+            <ST>Social Destinations</ST>
+            <FG l="Discord Link"><input value={v('social_discord')} onChange={e => s('social_discord', e.target.value)} /></FG>
+            <FG l="Twitter / X Link"><input value={v('social_twitter')} onChange={e => s('social_twitter', e.target.value)} /></FG>
+            <FG l="YouTube Link"><input value={v('social_youtube')} onChange={e => s('social_youtube', e.target.value)} /></FG>
           </>}
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
             <button className="btn btn-primary" onClick={saveSettings} disabled={saving}>
-              {saving ? <div className="spinner spinner-sm" /> : <><Save size={14} /> Force Database Override</>}
+              {saving ? <div className="spinner spinner-sm" /> : <><Save size={14} /> Force Database Overwrite</>}
             </button>
           </div>
         </div>
       </div>
-
-      {/* Custom Payment Modal Portal Module */}
-      {payModal && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setPayModal(null)}>
-          <div className="modal modal-lg">
-            <div className="flex-between mb-4">
-              <h3 style={{ fontWeight: 700, fontSize: 16 }}>Custom Gateway Options</h3>
-              <button className="btn-ghost" onClick={() => setPayModal(null)}><X size={18} /></button>
-            </div>
-            <div className="grid-2">
-              <FG l="Method Name *"><input value={payForm.name} onChange={e => setPayForm(f => ({ ...f, name: e.target.value }))} /></FG>
-              <FG l="Icon / Emoji"><input value={payForm.icon} onChange={e => setPayForm(f => ({ ...f, icon: e.target.value }))} /></FG>
-            </div>
-            <FG l="Account Information"><input value={payForm.account_info} onChange={e => setPayForm(f => ({ ...f, account_info: e.target.value }))} /></FG>
-            <FG l="Payment Instructions"><textarea rows={3} value={payForm.instructions} onChange={e => setPayForm(f => ({ ...f, instructions: e.target.value }))} /></FG>
-            <FG l="QR Code Image URL"><input value={payForm.qr_code_url} onChange={e => setPayForm(f => ({ ...f, qr_code_url: e.target.value }))} /></FG>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 16 }}>
-              <button className="btn btn-secondary" onClick={() => setPayModal(null)}>Cancel</button>
-              <button className="btn btn-primary" onClick={saveCustomPayment} disabled={savingPay}>Confirm</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
