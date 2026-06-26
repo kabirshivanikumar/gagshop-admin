@@ -42,8 +42,8 @@ export default function Orders() {
     (o.guest_email || '').toLowerCase().includes(search.toLowerCase())
   )
 
-  // Reads proof properties dynamically depending on how your columns are named
-  const getProofUrl = (order) => order?.proof_url || order?.receipt_url || order?.payment_proof || null
+  // Explicitly mapping to your new 'payment_proof' column
+  const getProofUrl = (order) => order?.payment_proof || null
 
   return (
     <div>
@@ -120,7 +120,7 @@ export default function Orders() {
               </div>
             ))}
 
-            {/* NEW EXTENDED MODULE: Dynamic Payment Verification Window */}
+            {/* Payment Proof Verification Frame */}
             {getProofUrl(selected) ? (
               <>
                 <div className="divider" />
@@ -131,7 +131,7 @@ export default function Orders() {
                   </a>
                 </div>
                 <div style={{ position: 'relative', width: '100%', maxHeight: 180, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)', background: 'rgba(0,0,0,0.2)', marginBottom: 12 }}>
-                  <img src={getProofUrl(selected)} alt="Receipt attachment verification block" style={{ width: '100%', height: '100%', objectFit: 'contain', maxHeight: 180, display: 'block' }} />
+                  <img src={getProofUrl(selected)} alt="Receipt verification window" style={{ width: '100%', height: '100%', objectFit: 'contain', maxHeight: 180, display: 'block' }} />
                 </div>
                 {selected.status === 'pending' && (
                   <button className="btn btn-primary" onClick={() => updateStatus(selected.id, 'paid')} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--success)', borderColor: 'var(--success)', color: '#fff', fontSize: 12, padding: '8px 12px' }}>
