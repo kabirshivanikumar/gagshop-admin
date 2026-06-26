@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Search, RefreshCw, X } from 'lucide-react'
+import { Search, RefreshCw, X, CheckCircle, ExternalLink } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useSettings } from '../context/SettingsContext'
 import { useToast } from '../components/ui/Toast'
@@ -42,6 +42,9 @@ export default function Orders() {
     (o.guest_email || '').toLowerCase().includes(search.toLowerCase())
   )
 
+  // Reads proof properties dynamically depending on how your columns are named
+  const getProofUrl = (order) => order?.proof_url || order?.receipt_url || order?.payment_proof || null
+
   return (
     <div>
       <div className="section-header">
@@ -83,7 +86,9 @@ export default function Orders() {
                       <td style={{ fontSize: 11, color: 'var(--muted)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.guest_email || '—'}</td>
                       <td style={{ fontSize: 12 }}>{o.items?.length || 0}</td>
                       <td style={{ fontWeight: 700, fontSize: 13 }}>{cur}{Number(o.total).toFixed(2)}</td>
-                      <td style={{ fontSize: 12, textTransform: 'capitalize' }}>{o.payment_method || '—'}</td>
+                      <td style={{ fontSize: 12, textTransform: 'capitalize' }}>
+                        {o.payment_method || '—'} {getProofUrl(o) && <span style={{ fontSize: 10, color: 'var(--success)', background: 'rgba(16,185,129,0.1)', padding: '2px 5px', borderRadius: 4, marginLeft: 4 }}>📎 Proof</span>}
+                      </td>
                       <td>
                         <select value={o.status} onChange={e => { e.stopPropagation(); updateStatus(o.id, e.target.value) }} onClick={e => e.stopPropagation()}
                           style={{ width: 'auto', padding: '3px 8px', fontSize: 11, fontWeight: 600, color: SCV[o.status], background: `${SCV[o.status]}18`, border: `1px solid ${SCV[o.status]}40`, borderRadius: 6 }}>
@@ -114,6 +119,37 @@ export default function Orders() {
                 <span>{v}</span>
               </div>
             ))}
+
+            {/* NEW EXTENDED MODULE: Dynamic Payment Verification Window */}
+            {getProofUrl(selected) ? (
+              <>
+                <div className="divider" />
+                <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 10, color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>Customer Payment Proof</span>
+                  <a href={getProofUrl(selected)} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 3, color: 'var(--primary)', fontSize: 11, textTransform: 'none' }}>
+                    Open <ExternalLink size={10} />
+                  </a>
+                </div>
+                <div style={{ position: 'relative', width: '100%', maxHeight: 180, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)', background: 'rgba(0,0,0,0.2)', marginBottom: 12 }}>
+                  <img src={getProofUrl(selected)} alt="Receipt attachment verification block" style={{ width: '100%', height: '100%', objectFit: 'contain', maxHeight: 180, display: 'block' }} />
+                </div>
+                {selected.status === 'pending' && (
+                  <button className="btn btn-primary" onClick={() => updateStatus(selected.id, 'paid')} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--success)', borderColor: 'var(--success)', color: '#fff', fontSize: 12, padding: '8px 12px' }}>
+                    <CheckCircle size={14} /> Approve & Mark as Paid
+                  </button>
+                )}
+              </>
+            ) : (
+              selected.payment_method !== 'paypal' && selected.payment_method !== 'stripe' && (
+                <>
+                  <div className="divider" />
+                  <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', padding: '8px 0', background: 'rgba(255,255,255,0.02)', borderRadius: 6, border: '1px dashed var(--border)' }}>
+                    No manual transaction file uploaded yet.
+                  </div>
+                </>
+              )
+            )}
+
             <div className="divider" />
             <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Items</div>
             {selected.items?.map((item, i) => (
